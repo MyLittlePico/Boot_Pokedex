@@ -7,6 +7,5 @@ import(
 func cleanInput(test string) []string{
 
 	words := strings.Fields(strings.ToLower(test))
-	
 	return words
 }
