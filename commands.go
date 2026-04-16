@@ -7,12 +7,13 @@ import(
 	"encoding/json"
 	"io"
 	"github.com/MyLittlePico/pokedex/internal/pokeAPI"
+	"github.com/MyLittlePico/pokedex/internal/pokecache"
 )
 
 type cliCommand struct{
 	name string
 	description string
-	callback func(conf *config) error
+	callback func(conf *config, cache *pokecache.Cache) error
 }
 type config struct{
 	nextUrl string
@@ -46,13 +47,13 @@ func getCommands() map[string]cliCommand{
 }
 
 
-func commandExit(conf *config) error{
+func commandExit(conf *config, cache *pokecache.Cache) error{
 	fmt.Println("Closing the Pokedex... Goodbye!")	
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(conf *config) error{
+func commandHelp(conf *config, cache *pokecache.Cache) error{
 	fmt.Printf("Welcome to the Pokedex!\nUsage:\n\n")
 	for _, cmd := range getCommands(){
 		fmt.Printf("%s: %s\n",cmd.name, cmd.description)
@@ -60,48 +61,66 @@ func commandHelp(conf *config) error{
 	return nil
 }
 
-func commandMap(conf *config) error{
+func commandMap(conf *config, cache *pokecache.Cache) error{
 	url := conf.nextUrl
-	res, err := http.Get(url)
-	if err != nil{
-		return err
+	val, ok := cache.Get(url)
+	var data []byte
+	if ok{
+		data = val
+	}else {
+		res, err := http.Get(url)
+		if err != nil{
+			return err
+		}
+		defer res.Body.Close()
+		data, err = io.ReadAll(res.Body)
+		if err != nil{
+			return err
+		}
+		cache.Add(url, data)
 	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	
-	var data pokeapi.LocationAreas
-	err = json.Unmarshal(body, &data)
+	var unmarshaledData pokeapi.LocationAreas
+	err := json.Unmarshal(data, &unmarshaledData)
 	if err != nil {
 		return err
 	}
-
-	conf.previousUrl = data.Previous
-	conf.nextUrl = data.Next
-	for _, locations := range data.Results {
+	conf.previousUrl = unmarshaledData.Previous
+	conf.nextUrl = unmarshaledData.Next
+	for _, locations := range unmarshaledData.Results {
 		fmt.Println(locations.Name)
 	} 
 	return nil
+
 }
-func commandMapb(conf *config) error{
+
+func commandMapb(conf *config, cache *pokecache.Cache) error{
 	url := conf.previousUrl
-	res, err := http.Get(url)
-	if err != nil{
-		return err
+	val, ok := cache.Get(url)
+	var data []byte
+	if ok{
+		data = val
+	}else {
+		res, err := http.Get(url)
+		if err != nil{
+			return err
+		}
+		defer res.Body.Close()
+		data, err = io.ReadAll(res.Body)
+		if err != nil{
+			return err
+		}
+		cache.Add(url, data)
 	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	
-	var data pokeapi.LocationAreas
-	err = json.Unmarshal(body, &data)
+	var unmarshaledData pokeapi.LocationAreas
+	err := json.Unmarshal(data, &unmarshaledData)
 	if err != nil {
 		return err
 	}
-
-	conf.previousUrl = data.Previous
-	conf.nextUrl = data.Next
-	for _, locations := range data.Results {
+	conf.previousUrl = unmarshaledData.Previous
+	conf.nextUrl = unmarshaledData.Next
+	for _, locations := range unmarshaledData.Results {
 		fmt.Println(locations.Name)
 	} 
 	return nil
-}
 
+}
