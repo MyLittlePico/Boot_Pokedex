@@ -3,9 +3,7 @@ package main
 import(
 	"fmt"
 	"os"
-	"net/http"
 	"encoding/json"
-	"io"
 	"github.com/MyLittlePico/pokedex/internal/pokeAPI"
 	"github.com/MyLittlePico/pokedex/internal/pokecache"
 )
@@ -13,7 +11,7 @@ import(
 type cliCommand struct{
 	name string
 	description string
-	callback func(conf *config, cache *pokecache.Cache) error
+	callback func(conf *config, cache *pokecache.Cache, args []string) error
 }
 type config struct{
 	nextUrl string
@@ -42,18 +40,35 @@ func getCommands() map[string]cliCommand{
 			description: "Displays previous 20 areas",
 			callback: commandMapb,
 		},
+		"explore":{
+			name: "explore",
+			description: "Displays Pokémons locate in an area",
+			callback: commandExplore,
+		},
+		"catch":{
+			name :"catch",
+			description: "Catch Pokemon and add to the Pokedex.",
+		},
+		"inspect":{
+			name :"inspect",
+			description:"fuck you",
+		},
+		"pokedex":{
+			name :"pokedex",
+			description: "go to hell",
+		},
 	}
 
 }
 
 
-func commandExit(conf *config, cache *pokecache.Cache) error{
+func commandExit(conf *config, cache *pokecache.Cache, args []string) error{
 	fmt.Println("Closing the Pokedex... Goodbye!")	
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(conf *config, cache *pokecache.Cache) error{
+func commandHelp(conf *config, cache *pokecache.Cache, args []string) error{
 	fmt.Printf("Welcome to the Pokedex!\nUsage:\n\n")
 	for _, cmd := range getCommands(){
 		fmt.Printf("%s: %s\n",cmd.name, cmd.description)
@@ -61,66 +76,55 @@ func commandHelp(conf *config, cache *pokecache.Cache) error{
 	return nil
 }
 
-func commandMap(conf *config, cache *pokecache.Cache) error{
+func commandMap(conf *config, cache *pokecache.Cache, args []string) error{
 	url := conf.nextUrl
-	val, ok := cache.Get(url)
-	var data []byte
-	if ok{
-		data = val
-	}else {
-		res, err := http.Get(url)
-		if err != nil{
-			return err
-		}
-		defer res.Body.Close()
-		data, err = io.ReadAll(res.Body)
-		if err != nil{
-			return err
-		}
-		cache.Add(url, data)
+	res, err := cache.Url(url)
+	if err != nil{
+		return err
 	}
-	var unmarshaledData pokeapi.LocationAreas
-	err := json.Unmarshal(data, &unmarshaledData)
+	return processLocationAreasData(conf, res)
+}
+
+func commandMapb(conf *config, cache *pokecache.Cache, args []string) error{
+	url := conf.previousUrl
+	res, err := cache.Url(url)
+	if err != nil{
+		return err
+	}
+	return processLocationAreasData(conf, res)
+}
+func processLocationAreasData (conf *config, res []byte) error{
+	var data pokeapi.LocationAreas
+	err := json.Unmarshal(res, &data)
 	if err != nil {
 		return err
 	}
-	conf.previousUrl = unmarshaledData.Previous
-	conf.nextUrl = unmarshaledData.Next
-	for _, locations := range unmarshaledData.Results {
+	conf.previousUrl = data.Previous
+	conf.nextUrl = data.Next
+	for _, locations := range data.Results {
 		fmt.Println(locations.Name)
 	} 
 	return nil
+}
+
+func commandExplore(conf *config, cache *pokecache.Cache, args []string) error{
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/location-area/%s/", args[0])
+	res, err := cache.Url(url)
+	if err != nil {
+		return err
+	}
+	return processAreaDetailData(res)
 
 }
 
-func commandMapb(conf *config, cache *pokecache.Cache) error{
-	url := conf.previousUrl
-	val, ok := cache.Get(url)
-	var data []byte
-	if ok{
-		data = val
-	}else {
-		res, err := http.Get(url)
-		if err != nil{
-			return err
-		}
-		defer res.Body.Close()
-		data, err = io.ReadAll(res.Body)
-		if err != nil{
-			return err
-		}
-		cache.Add(url, data)
-	}
-	var unmarshaledData pokeapi.LocationAreas
-	err := json.Unmarshal(data, &unmarshaledData)
+func processAreaDetailData(res []byte) error{
+	var data pokeapi.AreaDetail
+	err := json.Unmarshal(res, &data)
 	if err != nil {
 		return err
 	}
-	conf.previousUrl = unmarshaledData.Previous
-	conf.nextUrl = unmarshaledData.Next
-	for _, locations := range unmarshaledData.Results {
-		fmt.Println(locations.Name)
-	} 
+	for _, info := range data.PokemonEncounters{
+		fmt.Printf("-%s\n", info.Pokemon.Name)
+	}
 	return nil
-
 }

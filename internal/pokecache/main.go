@@ -3,6 +3,8 @@ package pokecache
 import (
 	"time"
 	"sync"
+	"net/http"
+	"io"
 )
 
 
@@ -13,6 +15,24 @@ type Cache struct{
 type CacheEntry struct{
 	createdAt time.Time
 	val []byte
+}
+
+func (c *Cache) Url(url string) ([]byte, error) {
+	val, ok := c.Get(url)
+	if ok{
+		return val, nil
+	}
+	res, err := http.Get(url)
+	if err != nil{
+		return nil, err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil{
+		return nil, err
+	}
+	c.Add(url, data)
+	return data, nil
 }
 
 
