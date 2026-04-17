@@ -73,7 +73,8 @@ func getCommands() map[string]cliCommand{
 		},
 		"pokedex":{
 			name :"pokedex",
-			description: "go to hell",
+			description: "Display your pokedex",
+			callback: commandPokedex,
 		},
 	}
 
@@ -195,6 +196,19 @@ func commandInspect(conf *config, cache *pokecache.Cache, args []string) error{
 	fmt.Println("Types:")
 	for _,theType := range pokemon.Types{
 		fmt.Printf("\t-%v\n",theType.Type.Name)
+	}
+	return nil
+}
+
+func commandPokedex(conf *config, cache *pokecache.Cache, args []string) error{
+	dex := conf.pokedex
+	if len(dex) == 0 {
+		fmt.Println ("Your pokedex is empty, go catch 'em all")
+		return nil
+	}
+	fmt.Println ("Your Pokedex:")
+	for key , _:= range dex{
+		fmt.Printf ("-%s\n",key)
 	}
 	return nil
 }
